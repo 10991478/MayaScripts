@@ -189,6 +189,50 @@ global proc float Calculate(string $operation, float $nums[], int $shouldPrint){
 }
 
 
+//Methods for the actual Calculator ^^^
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Methods for the UI vvv
+
+
+/*HOW MY UI SYSTEM LOOKS:
+    - The UI pops up with radio buttons to select which operation to perform
+    - There's a field to enter the base number & a button to update it
+    - There's a field to enter an additional operating number & a button to add it in
+    - There's a button to remove the last operating number from the calculation
+    - There's a button to reset all the values
+    - There's a text field at the bottom that displays the entire calculation
+
+HOW MY UI SYSTEM WORKS:
+    - When the window is created, an objectVar float array - "operationNumsArray" - is created containing the
+        value of the base num field (always 0 to begin with)
+    - There's a method - UpdateTextDisplay() - that checks which radio button is pressed, then runs the Calculator()
+        method depending on which radio button is pressed and using "operationNumsArray" as the array input, then
+        updates the text display at the bottom with the equation/calculation
+    - The button next to the operating number field appends that number to the end of the array & runs UpdateTextDisplay()
+    - The button next to the base number field sets the first value of the array to that number & runs UpdateTextDisplay()
+    - The removeLastValueButton removes the last item from the array & runs UpdateTextDisplay()
+    - The resetValuesButton sets both float fields to 0 & re-initializes the array as {0} then runs UpdateTextDisplay()
+    - Any time a radio button is clicked, UpdateTextDisplay() gets run
+    */
+
+
 
 global proc UpdateTextDisplay(){
     string $operationRadios = `optionVar -q "operationRadios"`;
