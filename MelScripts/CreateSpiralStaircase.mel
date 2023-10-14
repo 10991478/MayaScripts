@@ -1,0 +1,15 @@
+proc CreateSpiralStaircase(float $radius, float $heightBetweenSteps, float $rotationAngle, int $numOfSteps, float $stepDimensions[], float $offset[]){
+    string $currentObj[];
+    for ($i = 0; $i < $numOfSteps; $i++){
+        $currentObj = `polyCube -width $stepDimensions[0] -height $stepDimensions[1] -depth $stepDimensions[2] -subdivisionsX 1 -subdivisionsY 1 -subdivisionsZ 1 -axis 0 1 0 -createUVs 4 -constructionHistory 1 -name "spiralStaircaseStep0"`;
+        float $moveDistX = ($radius + $stepDimensions[2]*0.4)*sin(deg_to_rad($rotationAngle*$i)) + $offset[0];
+        float $moveDistY = $i*$heightBetweenSteps + $stepDimensions[1]/2 + $offset[1];
+        float $moveDistZ = ($radius + $stepDimensions[2]*0.4)*cos(deg_to_rad($rotationAngle*$i)) + $offset[2];
+        move -worldSpace -worldSpaceDistance $moveDistX $moveDistY $moveDistZ $currentObj[0];
+        rotate -relative -worldSpace -forceOrderXYZ 0 ($rotationAngle*$i) 0 $currentObj[0];
+    }
+    $currentObj = `polyCylinder -radius $radius -height ($heightBetweenSteps*$numOfSteps) -subdivisionsX 20 -subdivisionsY $numOfSteps -subdivisionsZ 1 -axis 0 1 0 -roundCap 0 -createUVs 3 -constructionHistory 1 -name "stairCollumn"`;
+    move -worldSpace -worldSpaceDistance $offset[0] ($heightBetweenSteps*$numOfSteps/2 + $offset[1]) $offset[2] $currentObj[0];
+}
+
+CreateSpiralStaircase(4.0, 1.0, 30.0, 20, {3.0, 0.4, 5.0}, {-10, 12, 6});

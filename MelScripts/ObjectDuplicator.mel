@@ -1,0 +1,75 @@
+global proc PlacementGenerator(float $xMin, float $xMax, float $yMin, float $yMax, float $zMin, float $zMax, int $numOfDupes){
+    string $objectArray[] = `ls -selection`;
+
+    for ($i = 0; $i < size($objectArray); $i++){
+
+        for ($j = 0; $j < $numOfDupes; $j++){
+            string $dups[] = `duplicate $objectArray[$i]`;
+            string $dup = $dups[0];
+
+            float $xPos =  `rand $xMin $xMax`;
+            float $yPos =  `rand $yMin $yMax`;
+            float $zPos =  `rand $zMin $zMax`;
+
+            xform -worldSpace -translation $xPos $yPos $zPos $dup;
+        }
+    }
+}
+
+global proc RunPlaceGenFromWindow(){
+    string $x1 = `optionVar -q "xMin"`;
+    string $x2 = `optionVar -q "xMax"`;
+    string $y1 = `optionVar -q "yMin"`;
+    string $y2 = `optionVar -q "yMax"`;
+    string $z1 = `optionVar -q "zMin"`;
+    string $z2 = `optionVar -q "zMax"`;
+    string $dups = `optionVar -q "numDups"`;
+
+
+    float $xMin = `floatField -q -value $x1`;
+    float $xMax = `floatField -q -value $x2`;
+    float $yMin = `floatField -q -value $y1`;
+    float $yMax = `floatField -q -value $y2`;
+    float $zMin = `floatField -q -value $z1`;
+    float $zMax = `floatField -q -value $z2`;
+    int $numDups = `intField -q -value $dups`;
+
+
+    PlacementGenerator($xMin, $xMax, $yMin, $yMax, $zMin, $zMax, $numDups);
+}
+
+
+global proc GenerateWindow(){
+    string $mainWindow = "placeGenWindow";
+    if (`window -exists $mainWindow`){
+        deleteUI $mainWindow;
+    }
+
+    window -title "Placement Generator" -sizeable 1 -height 200 -width 200 $mainWindow;
+        string $baseColumn = `columnLayout -parent $mainWindow`;
+            string $xRow = `rowLayout -numberOfColumns 4 -columnAttach4 "both" "both" "both" "both" -parent $baseColumn`;
+                text -label "   X Min: " -parent $xRow;
+                optionVar -stringValue "xMin" `floatField -parent $xRow`;
+                text -label "   X Max: " -parent $xRow;
+                optionVar -stringValue "xMax" `floatField -parent $xRow`;
+            string $yRow = `rowLayout -numberOfColumns 4 -columnAttach4 "both" "both" "both" "both" -parent $baseColumn`;
+                text -label "   Y Min: " -parent $yRow;
+                optionVar -stringValue "yMin" `floatField -parent $yRow`;
+                text -label "   Y Max: " -parent $yRow;
+                optionVar -stringValue "yMax" `floatField -parent $yRow`;
+            string $zRow = `rowLayout -numberOfColumns 4 -columnAttach4 "both" "both" "both" "both" -parent $baseColumn`;
+                text -label "   Z Min: " -parent $zRow;
+                optionVar -stringValue "zMin" `floatField -parent $zRow`;
+                text -label "   Z Max: " -parent $zRow;
+                optionVar -stringValue "zMax" `floatField -parent $zRow`;
+            string $dupRow = `rowLayout -numberOfColumns 2 -parent $baseColumn`;
+                text -label "   Duplicates: " -parent $dupRow;
+                optionVar -stringValue "numDups" `intField -parent $dupRow`;
+
+
+            string $runButton = `button -parent $baseColumn -label "Generate Duplicates" -command "RunPlaceGenFromWindow" "runBT"`;
+    
+    showWindow $mainWindow;
+}
+
+GenerateWindow();

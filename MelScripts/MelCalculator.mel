@@ -1,0 +1,334 @@
+global proc float Multiply(float $nums[]){
+    float $product = $nums[0];
+    for ($i = 1; $i < size($nums); $i++){
+        $product *= $nums[$i];
+    }
+    return $product;
+}
+
+global proc float Divide(float $nums[]){
+    float $quotient = $nums[0];
+    for ($i = 1; $i < size($nums); $i++){
+        $quotient /= $nums[$i];
+    }
+    return $quotient;
+}
+
+global proc float Add(float $nums[]){
+    float $sum = 0;
+    for ($i = 0; $i < size($nums); $i++){
+        $sum += $nums[$i];
+    }
+    return $sum;
+}
+
+global proc float Subtract(float $nums[]){
+    float $difference = $nums[0];
+    for ($i = 1; $i < size($nums); $i++){
+        $difference -= $nums[$i];
+    }
+    return $difference;
+}
+
+global proc float Power(float $nums[]){
+    float $base = $nums[0];
+    if (size($nums) == 1){
+        return $base;
+    }
+    else {
+        int $power = 1;
+        for ($i = 1; $i < size($nums); $i++){
+            $power *= (int)$nums[$i];
+        }
+        int $tempPower = `abs $power`;
+        float $result = 1;
+        for ($i = 0; $i < $tempPower; $i++){
+            $result *= $base;
+        }
+        if ($power < 0){
+            $result = 1/$result;
+        }
+        return $result;
+    }
+}
+
+global proc float Mean(float $nums[]){
+    float $mean = 0;
+    for ($i = 0; $i < size($nums); $i++){
+        $mean += $nums[$i];
+    }
+    $mean /= size($nums);
+    return $mean;
+}
+
+global proc float Median(float $nums[]){
+    float $orderedArray[] = $nums;
+    int $arraySize = size($orderedArray);
+    for ($i = 0; $i < $arraySize; $i++){
+        int $haveSwapped = 0;
+        for($j = 0; $j < $arraySize - 1; $j++){
+            if($orderedArray[$j] > $orderedArray[$j+1]){
+                float $temp = $orderedArray[$j];
+                $orderedArray[$j] = $orderedArray[$j+1];
+                $orderedArray[$j+1] = $temp;
+                $haveSwapped = 1;
+            }
+        }
+        if($haveSwapped == 0){
+            break;  
+        }
+    }
+
+    float $median = $orderedArray[(int)($arraySize/2)];
+    if (`fmod $arraySize 2` == 0){
+        $median += $orderedArray[(int)($arraySize/2) - 1];
+        $median /= 2;
+    }
+
+    return $median;
+}
+
+global proc float Calculate(string $operation, float $nums[], int $shouldPrint){
+    $operation = `tolower $operation`;
+    int $numSize = size($nums);
+    string $output = "";
+    float $result = 0;
+    switch ($operation){
+        case "add":
+            $result = Add($nums);
+            $output += "The sum of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += " + ";
+                }
+            }
+            $output += " is " + $result + ".\n";
+            break;
+        //
+        case "subtract":
+            $result = Subtract($nums);
+            $output += "The difference of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += " - ";
+                }
+            }
+            $output += " is " + $result + ".\n";
+            break;
+        //
+        case "multiply":
+            $result = Multiply($nums);
+            $output += "The product of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += " * ";
+                }
+            }
+            $output += " is " + $result + ".\n";
+            break;
+        //
+        case "divide":
+            $result = Divide($nums);
+            $output += "The quotient of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += " / ";
+                }
+            }
+            $output += " is " + $result + "\n";
+            break;
+        //
+        case "power":
+            $result = Power($nums);
+            $output = "The product of " + $nums[0];
+            for ($i = 1; $i < $numSize; $i++){
+                $output += " ^ " + (int)$nums[$i];
+            }
+            $output += " is " + $result + "\n";
+            break;
+        //
+        case "mean":
+            $result = Mean($nums);
+            $output += "The mean of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += ", ";
+                }
+            }
+            $output += " is " + $result + ".\n";
+            break;
+        //
+        case "median":
+            $result = Median($nums);
+            $output += "The median of ";
+            for ($i = 0; $i < $numSize; $i++){
+                $output += $nums[$i];
+                if ($i != $numSize - 1){
+                    $output += ", ";
+                }
+            }
+            $output += " is " + $result + ".\n";
+            break;
+        //
+        default:
+            $output += $operation + " is not a valid operation. Please check for whitespaces and run the\n";
+            $output += "Calculate(string $operation, float $nums[], int $shouldPrint) method with one of the following operations:\n";
+            $output += "add\nsubtract\nmultiply\ndivide\npower\nmean\nmedian\n";
+            $output += "(upper/lowercase of letters does not matter)";
+            break;
+    }
+    if ($shouldPrint != 0){
+        print($output);
+    }
+    return $result;
+}
+
+
+
+global proc UpdateTextDisplay(){
+    string $operationRadios = `optionVar -q "operationRadios"`;
+    string $selectedRadio = `radioCollection -q -select $operationRadios`;
+    float $operatingArray[] = `optionVar -q "operationNumsArray"`;
+    int $numSize = size($operatingArray);
+    string $textSTR = "";
+    
+    if ($selectedRadio == "addRBT"){
+        float $result = Calculate("add", $operatingArray, 0);
+        $textSTR = $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += " + " + $operatingArray[$i];
+        }
+        $textSTR += " = " + $result;
+    }
+    else if ($selectedRadio == "subRBT"){
+        float $result = Calculate("subtract", $operatingArray, 0);
+        $textSTR = $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += " - " + $operatingArray[$i];
+        }
+        $textSTR += " = " + $result;
+    }
+    else if ($selectedRadio == "multRBT"){
+        float $result = Calculate("multiply", $operatingArray, 0);
+        $textSTR = $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += " * " + $operatingArray[$i];
+        }
+        $textSTR += " = " + $result;
+    }
+    else if ($selectedRadio == "divRBT"){
+        float $result = Calculate("divide", $operatingArray, 0);
+        $textSTR = $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += " / " + $operatingArray[$i];
+        }
+        $textSTR += " = " + $result;
+    }
+    else if ($selectedRadio == "powRBT"){
+        float $result = Calculate("power", $operatingArray, 0);
+        $textSTR = $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += " ^ " + (int)$operatingArray[$i];
+        }
+        $textSTR += " = " + $result;
+    }
+    else if ($selectedRadio == "meanRBT"){
+        float $result = Calculate("mean", $operatingArray, 0);
+        $textSTR = "The mean of " + $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += ", " + $operatingArray[$i];
+        }
+        $textSTR += " is " + $result;
+    }
+    else if ($selectedRadio == "medRBT"){
+        float $result = Calculate("median", $operatingArray, 0);
+        $textSTR = "The median of " + $operatingArray[0];
+        for ($i = 1; $i < $numSize; $i++){
+            $textSTR += ", " + $operatingArray[$i];
+        }
+        $textSTR += " is " + $result;
+    }
+    else{
+        $textSTR = "No operation is selected.";
+    }
+
+    text -e -label $textSTR "resultTXT";
+}
+
+global proc UpdateBaseNum(){
+    float $tempArr[] = `optionVar -q "operationNumsArray"`;
+    $tempArr[0] = `floatField -q -value "baseNum"`;
+    optionVar -floatArray "operationNumsArray";
+    for ($i = 0; $i < size($tempArr); $i++){
+        optionVar -floatValueAppend "operationNumsArray" $tempArr[$i];
+    }
+    UpdateTextDisplay();
+}
+
+global proc AddOpNum(){
+    optionVar -floatValueAppend "operationNumsArray" `floatField -q -value "opNum"`;
+    UpdateTextDisplay();
+}
+
+global proc ResetValues(){
+    floatField -e -value 0.0 "baseNum";
+    floatField -e -value 0.0 "opNum";
+    optionVar -floatArray "operationNumsArray";
+    optionVar -floatValueAppend "operationNumsArray" 0.0;
+    UpdateTextDisplay();
+}
+
+global proc RemoveLastValue(){
+    int $lastIndex = size(`optionVar -q "operationNumsArray"`) - 1;
+    if ($lastIndex > 0){
+        optionVar -removeFromArray "operationNumsArray" $lastIndex;
+        UpdateTextDisplay();
+    }
+}
+
+
+global proc CalculatorUI(){
+    string $mainWindow = "calculatorWindow";
+    if (`window -exists $mainWindow`){
+        deleteUI $mainWindow;
+    }
+
+    window -title "Calculator" -sizeable 1 -height 300 -width 400 $mainWindow;
+        string $mainColumn = `columnLayout -parent $mainWindow`;
+            string $radioRow = `rowLayout -numberOfColumns 2 -parent $mainColumn`;
+                optionVar -stringValue "operationRadios" `radioCollection`;
+                string $operationRadios = `optionVar -q "operationRadios"`;
+                string $leftColumn = `columnLayout -parent $radioRow`;
+                    optionVar -stringValue "addRBT" `radioButton -label "Add" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $leftColumn "addRBT"`;
+                    optionVar -stringValue "subRBT" `radioButton -label "Subtract" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $leftColumn "subRBT"`;
+                    optionVar -stringValue "multRBT" `radioButton -label "Multiply" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $leftColumn "multRBT"`;
+                    optionVar -stringValue "divRBT" `radioButton -label "Divide" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $leftColumn "divRBT"`;
+                string $rightColumn = `columnLayout -parent $radioRow`;
+                    optionVar -stringValue "powRBT" `radioButton -label "Power" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $rightColumn "powRBT"`;
+                    optionVar -stringValue "meanRBT" `radioButton -label "Mean" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $rightColumn "meanRBT"`;
+                    optionVar -stringValue "medRBT" `radioButton -label "Median" -onCommand "UpdateTextDisplay" -collection $operationRadios -parent $rightColumn "medRBT"`;
+            string $finalColumn = `columnLayout -parent $mainColumn`;
+                string $bnRow = `rowLayout -numberOfColumns 3 -parent $finalColumn`;
+                    text -label "  Base Number:  " -parent $bnRow;
+                    optionVar -stringValue "baseNum" `floatField -parent $bnRow "baseNum"`;
+                    string $addNumButton = `button -label "Set Base Number" -command "UpdateBaseNum" -parent $bnRow`;
+                string $onRow = `rowLayout -numberOfColumns 3 -parent $finalColumn`;
+                    text -label "  Operating Numbers:  " -parent $onRow;
+                    optionVar -stringValue "opNum" `floatField -parent $onRow "opNum"`;
+                    string $addNumButton = `button -label "Add Number to Operation" -command "AddOpNum" -parent $onRow`;
+                string $removeLastValueButton = `button -label "Remove Last Value" -command "RemoveLastValue" -parent $finalColumn`;
+                string $resetValuesButton = `button -label "Reset Values" -command "ResetValues" -parent $finalColumn`;
+    optionVar -floatArray "operationNumsArray";
+    optionVar -floatValueAppend "operationNumsArray" `floatField -q -value "baseNum"`;
+                text -label "\n\n\n" -parent $finalColumn "blankTextChunk";
+                optionVar -stringValue "resultTXT" `text -label "Select an operation to display the calculation" -parent $finalColumn "resultTXT"`;
+    
+    showWindow $mainWindow;
+}
+
+CalculatorUI();

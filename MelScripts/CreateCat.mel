@@ -1,0 +1,77 @@
+//mel script for creating a cat
+
+//creating the head
+polySphere -radius 1 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "headSphere";
+move -relative -objectSpace -worldSpaceDistance 0 2.5 0;
+//selecting bottom half of the sphere and moving it downwards
+select -replace headSphere.f[0:179] headSphere.f[360:379];
+move -relative 0 -0.723505 0 ;
+
+//creating the right ear
+polyCone -radius 1 -height 2 -subdivisionsX 20 -subdivisionsY 1 -subdivisionsZ 0 -axis 0 1 0 -roundCap 1 -createUVs 3 -constructionHistory 1 -name "ear1";
+select -replace ear1;
+scale -relative 0.4 0.4 0.1 ;
+polySoftEdge -angle 10 -constructionHistory 1 ear1.e[29] ear1.e[39];
+select -replace ear1;
+move -relative -0.8 3.5 0 ;
+rotate -relative -objectSpace -forceOrderXYZ 0 0 36.12 ;
+
+//creating the left ear
+polyCone -radius 1 -height 2 -subdivisionsX 20 -subdivisionsY 1 -subdivisionsZ 0 -axis 0 1 0 -roundCap 1 -createUVs 3 -constructionHistory 1 -name "ear2";
+select -replace ear2;
+scale -relative 0.4 0.4 0.1 ;
+polySoftEdge -angle 10 -constructionHistory 1 ear2.e[29] ear2.e[39];
+select -replace ear2;
+move -relative 0.8 3.5 0 ;
+rotate -relative -objectSpace -forceOrderXYZ 0 0 -36.12 ;
+
+//creating the right eye
+polySphere -radius 0.12 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "eye1";
+select -replace eye1.f[0:179] eye1.f[360:379];
+move -relative 0 -.5 0 ;
+select -replace eye1;
+move -relative -0.3 2.3 0.9;
+
+//creating the left eye
+polySphere -radius 0.12 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "eye2";
+select -replace eye2.f[0:179] eye2.f[360:379];
+move -relative 0 -.5 0 ;
+select -replace eye2;
+move -relative 0.3 2.3 0.9;
+
+//creating the body
+polySphere -radius 0.45 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "bodySphere";
+scale -relative 1 0.85 1;
+move -relative 0 0.6 -0.36;
+
+//creating the front right leg
+polySphere -radius 0.2 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "frontLeg1";
+select -replace frontLeg1.f[0:179] frontLeg1.f[360:379];
+move -relative 0 -.4 0 ;
+select -replace frontLeg1;
+move -relative -0.228 0.532 -0.181;
+rotate -relative -objectSpace -forceOrderXYZ -8.998 -1.697 16.183;
+
+//creating the front left leg
+polySphere -radius 0.2 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "frontLeg2";
+select -replace frontLeg2.f[0:179] frontLeg2.f[360:379];
+move -relative 0 -.4 0 ;
+select -replace frontLeg2;
+move -relative 0.228 0.532 -0.181;
+rotate -relative -objectSpace -forceOrderXYZ -8.998 -1.697 -16.183;
+
+//creating the back right leg
+polySphere -radius 0.2 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "backLeg1";
+select -replace backLeg1.f[0:179] backLeg1.f[360:379];
+move -relative 0 -.4 0 ;
+select -replace backLeg1;
+move -relative -0.286 0.342 -0.673;
+rotate -relative -objectSpace -forceOrderXYZ -27.829 0.000 -67.417;
+
+//creating the back left leg
+polySphere -radius 0.2 -subdivisionsX 20 -subdivisionsY 20 -axis 0 1 0 -createUVs 2 -constructionHistory 1 -name "backLeg2";
+select -replace backLeg2.f[0:179] backLeg2.f[360:379];
+move -relative 0 -.4 0 ;
+select -replace backLeg2;
+move -relative 0.286 0.342 -0.673;
+rotate -relative -objectSpace -forceOrderXYZ -27.829 0.000 67.417;

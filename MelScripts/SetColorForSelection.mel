@@ -1,0 +1,17 @@
+proc SetColor(int $colorNum){
+    if ($colorNum > 31){
+        $colorNum = 31;
+    }
+    else if ($colorNum < 0){
+        $colorNum = 0;
+    }
+    string $objectArray[] = `ls -shapes`;
+    for ($i = 0; $i < size($objectArray); $i++){
+        string $ovrEn = $objectArray[$i] + ".overrideEnabled";
+        string $ovrClr = $objectArray[$i] + ".overrideColor";
+        setAttr $ovrEn 1 ;
+        setAttr $ovrClr $colorNum;
+    }
+}
+
+SetColor(5);
