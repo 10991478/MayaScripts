@@ -1,17 +1,34 @@
+//changes the wireframe/shape color of the selection(s)
 proc SetColor(int $colorNum){
-    if ($colorNum > 31){
-        $colorNum = 31;
-    }
-    else if ($colorNum < 0){
+    if ($colorNum > 31 || $colorNum < 0){
         $colorNum = 0;
+        warning("Color must be between 0-31 (inclusive)");
     }
-    string $objectArray[] = `ls -shapes`;
-    for ($i = 0; $i < size($objectArray); $i++){
-        string $ovrEn = $objectArray[$i] + ".overrideEnabled";
-        string $ovrClr = $objectArray[$i] + ".overrideColor";
-        setAttr $ovrEn 1 ;
-        setAttr $ovrClr $colorNum;
+
+
+    string $selectedObjects[] = `ls -selection`;
+    if (size($selectedObjects) < 1) error("No objects selected");
+    string $selectedShapes[] = `listRelatives -shapes $selectedObjects`;
+    if (size($selectedObjects) < 1)error("No shapes in selection");
+
+
+    for ($i = 0; $i < size($selectedShapes); $i++){
+        setAttr ($selectedShapes[$i] + ".overrideEnabled") 1;
+        setAttr ($selectedShapes[$i] + ".overrideColor") $colorNum;
     }
 }
 
-SetColor(5);
+proc SetColorRandom(){
+    string $selectedObjects[] = `ls -selection`;
+    if (size($selectedObjects) < 1) error("No objects selected");
+    string $selectedShapes[] = `listRelatives -shapes $selectedObjects`;
+    if (size($selectedObjects) < 1) error("No shapes in selection");
+
+    for ($i = 0; $i < size($selectedShapes); $i++){
+        int $colorNum = (int)(`rand 0 32`);
+        setAttr ($selectedShapes[$i] + ".overrideEnabled") 1;
+        setAttr ($selectedShapes[$i] + ".overrideColor") $colorNum;
+    }
+}
+
+SetColor(6);
