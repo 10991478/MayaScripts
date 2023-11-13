@@ -1,14 +1,14 @@
-# changes the wireframe/shape color of the selection(s)
-
 import maya.cmds as cmds
+import random
 
 
-def SetColor(colorNum):
-    colorNum = int(colorNum)
+def SetColor(colorNum, makeRandom = False):
+    if makeRandom == False:
+        colorNum = int(colorNum)
 
-    if colorNum > 31 or colorNum < 0:
-        colorNum = 0
-        cmds.warning("Number must be between 0-31")
+        if colorNum > 31 or colorNum < 0:
+            colorNum = 0
+            cmds.warning("Number must be between 0-31")
 
     selectedObjects = []
     selectedObjects = cmds.ls(selection = True)
@@ -22,7 +22,9 @@ def SetColor(colorNum):
 
 
     for shape in selectedShapes:
+        if makeRandom == True:
+            colorNum = random.randint(0, 31)
         cmds.setAttr((shape + ".overrideEnabled"), 1)
         cmds.setAttr((shape + ".overrideColor"), colorNum)
 
-SetColor(2)
+SetColor(1, makeRandom = True)
