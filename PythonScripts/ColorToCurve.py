@@ -26,5 +26,3 @@ def SetColor(colorNum, makeRandom = False):
             colorNum = random.randint(0, 31)
         cmds.setAttr((shape + ".overrideEnabled"), 1)
         cmds.setAttr((shape + ".overrideColor"), colorNum)
-
-SetColor(1, makeRandom = True)
