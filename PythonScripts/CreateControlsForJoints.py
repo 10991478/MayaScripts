@@ -3,7 +3,7 @@
 
 import maya.cmds as cmds
 
-def create_control_and_group(joint, colorRL):
+def create_control_and_group(joint, colorRL = True, constraints = True):
     # Get joint position
     joint_position = cmds.xform(joint, q=True, ws=True, t=True)
     
@@ -43,6 +43,10 @@ def create_control_and_group(joint, colorRL):
     elif control_name[:2] == "L_" and colorRL == True:
         cmds.setAttr((control_name + ".overrideEnabled"), 1)
         cmds.setAttr((control_name + ".overrideColor"), 6)
+
+    if constraints == True:
+        cmds.parentConstraint(control_name, joint)
+        cmds.scaleConstraint(control_name, joint)
     
     return control_name, parent_group_name
 
@@ -55,7 +59,7 @@ def main():
         return
     
     for joint in selected_joints:
-        control_name, parent_group_name = create_control_and_group(joint, True)
+        control_name, parent_group_name = create_control_and_group(joint)
         print(f"Created control: {control_name}, parent group: {parent_group_name}")
 
 if __name__ == "__main__":
