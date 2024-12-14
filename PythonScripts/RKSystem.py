@@ -1,3 +1,6 @@
+#Create constraints and switch for functioning RK system
+
+
 import maya.cmds as cmds
 
 def create_rk_ui():
