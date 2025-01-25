@@ -62,6 +62,7 @@ def create_lower_limb_twist_joints():
         cmds.matchTransform(end_joint, wrist_joint)
         cmds.makeIdentity(end_joint, apply=True, rotate=True)
         cmds.parentConstraint(aim_loc, end_joint)
+        cmds.scaleConstraint(wrist_joint, end_joint)
 
         # Create twist joints
         for i in range(1, num_joints + 1):
@@ -74,6 +75,8 @@ def create_lower_limb_twist_joints():
             cmds.pointConstraint(end_joint, twist_joint, weight=i)
             cmds.orientConstraint(elbow_joint, twist_joint, weight=(num_joints - i + 1))
             cmds.orientConstraint(end_joint, twist_joint, weight=i)
+            cmds.scaleConstraint(elbow_joint, twist_joint, weight=(num_joints - i + 1))
+            cmds.scaleConstraint(end_joint, twist_joint, weight=i)
 
     # Create UI
     if cmds.window("lowerLimbTwistWindow", exists=True):
