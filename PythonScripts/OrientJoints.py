@@ -12,16 +12,12 @@ def orient_three_joints():
         cmds.error("Please select exactly three joints.")
     
     j1, j2, j3 = selection
+    j1parent = cmds.listRelatives(j1, parent=True)
     
-    # Validate hierarchy
-    if cmds.listRelatives(j2, parent=True) != [j1]:
-        cmds.error("Second joint must be a child of the first joint.")
-    if cmds.listRelatives(j3, parent=True) != [j2]:
-        cmds.error("Third joint must be a child of the second joint.")
-    if cmds.listRelatives(j1, parent=True) is not None:
-        cmds.error("First joint must be parented to the world.")
     
     # Unparent joints
+    if j1parent is not None:
+        cmds.parent(j1, world=True)
     cmds.parent(j2, world=True)
     cmds.parent(j3, world=True)
     
@@ -49,6 +45,8 @@ def orient_three_joints():
     cmds.makeIdentity(j1, apply=True, rotate=True)
     
     # Reparent joints
+    if j1parent is not None:
+        cmds.parent(j1, j1parent)
     cmds.parent(j2, j1)
     cmds.parent(j3, j2)
     
