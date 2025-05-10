@@ -1,5 +1,4 @@
-#This is a maya python script that will create a UI window for selecting any rig's controls
-
+# Maya rig control selector script with "Check All Shown" and maximize on Functional UI
 
 from PySide2 import QtWidgets, QtCore
 from shiboken2 import wrapInstance
@@ -9,38 +8,25 @@ from functools import partial
 
 
 def get_maya_main_window():
-    main_window_ptr = omui.MQtUtil.mainWindow()
-    return wrapInstance(int(main_window_ptr), QtWidgets.QWidget)
-
+    ptr = omui.MQtUtil.mainWindow()
+    return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 class RigControlSelector(QtWidgets.QDialog):
-    """
-    Master UI: collects filter settings and rig roots, then spawns rig-specific UIs.
-    """
     def __init__(self, parent=get_maya_main_window()):
         super(RigControlSelector, self).__init__(parent)
-        # allow minimize
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMinimizeButtonHint)
         self.setWindowTitle("Rig Control UI Creator")
         self.setMinimumWidth(400)
         self.setLayout(QtWidgets.QVBoxLayout())
-
-        # store field widgets
-        self.req_prefix = None
-        self.req_infix = None
-        self.req_suffix = None
-        self.exc_prefix = None
-        self.exc_infix = None
-        self.exc_suffix = None
+        self.req_prefix = self.req_infix = self.req_suffix = None
+        self.exc_prefix = self.exc_infix = self.exc_suffix = None
         self.rig_field = None
-
         self.build_ui()
 
     def build_ui(self):
         # Required / Excluded filters
         self.layout().addWidget(self._make_filter_group("Required Text", default_suffix="_Ctrl", req=True))
         self.layout().addWidget(self._make_filter_group("Excluded Text", default_suffix="", req=False))
-
         # Rig selection
         rig_group = QtWidgets.QGroupBox("Rig Selection")
         rig_l = QtWidgets.QHBoxLayout(rig_group)
@@ -50,7 +36,6 @@ class RigControlSelector(QtWidgets.QDialog):
         btn.clicked.connect(self.grab_selected)
         rig_l.addWidget(btn)
         self.layout().addWidget(rig_group)
-
         # Generate button
         gen_btn = QtWidgets.QPushButton("Create Control UIs")
         gen_btn.clicked.connect(self.generate_uis)
@@ -66,7 +51,6 @@ class RigControlSelector(QtWidgets.QDialog):
         l.addRow("Prefixes (comma-separated)", prefix)
         l.addRow("Infixes (comma-separated)", infix)
         l.addRow("Suffixes (comma-separated)", suffix)
-
         if req:
             self.req_prefix, self.req_infix, self.req_suffix = prefix, infix, suffix
         else:
@@ -96,60 +80,57 @@ class RigControlSelector(QtWidgets.QDialog):
 
 
 def matches(name, reqs, excs):
-    # Required: must match any of each non-empty category
     def any_match(text, patterns, mode):
         if not patterns:
             return True
         for p in patterns:
-            if mode=='prefix' and text.startswith(p): return True
-            if mode=='infix' and p in text: return True
-            if mode=='suffix' and text.endswith(p): return True
+            if mode=='prefix' and text.startswith(p):
+                return True
+            if mode=='infix' and p in text:
+                return True
+            if mode=='suffix' and text.endswith(p):
+                return True
         return False
-
-    # Excluded: must NOT match any
     def any_excl(text, patterns, mode):
         for p in patterns:
-            if mode=='prefix' and text.startswith(p): return True
-            if mode=='infix' and p in text: return True
-            if mode=='suffix' and text.endswith(p): return True
+            if mode=='prefix' and text.startswith(p):
+                return True
+            if mode=='infix' and p in text:
+                return True
+            if mode=='suffix' and text.endswith(p):
+                return True
         return False
-
-    # check required
     if not (any_match(name, reqs['prefixes'], 'prefix') and
             any_match(name, reqs['infixes'], 'infix') and
             any_match(name, reqs['suffixes'], 'suffix')):
         return False
-    # check excluded
-    if any_excl(name, excs['prefixes'], 'prefix') or \
-       any_excl(name, excs['infixes'], 'infix') or \
-       any_excl(name, excs['suffixes'], 'suffix'):
+    if (any_excl(name, excs['prefixes'], 'prefix') or
+        any_excl(name, excs['infixes'], 'infix') or
+        any_excl(name, excs['suffixes'], 'suffix')):
         return False
     return True
 
-
 class RigUI(QtWidgets.QDialog):
-    """
-    Per-rig UI: lists controls, supports search, checkboxes, and selection sets.
-    """
     def __init__(self, root, reqs, excs, parent=get_maya_main_window()):
         super(RigUI, self).__init__(parent)
-        # allow minimize
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMinimizeButtonHint)
+        # allow minimize + maximize
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint)
         self.setWindowTitle(f"Controls: {root}")
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.resize(300, 400)
+        self.resize(300, 520)
 
         self.root = root
         self.reqs = reqs
         self.excs = excs
-        self.checks = []             # list of (checkbox, fullName)
-        self.row_widgets = []        # list of (row_widget, fullName)
+        self.checks = []
+        self.row_widgets = []
         self.selection_sets = {}
+        self.groups = {}
 
-        # Tabs: controls / sets
         tabs = QtWidgets.QTabWidget()
         tabs.addTab(self._make_controls_tab(), "Controls")
         tabs.addTab(self._make_sets_tab(), "Sets")
+        tabs.addTab(self._make_groups_tab(), "Groups")
         self.layout().addWidget(tabs)
         self.show()
 
@@ -157,33 +138,40 @@ class RigUI(QtWidgets.QDialog):
         w = QtWidgets.QWidget()
         l = QtWidgets.QVBoxLayout(w)
 
-        # Search row
+        # Search & control row
         search_row = QtWidgets.QHBoxLayout()
         self.search_field = QtWidgets.QLineEdit()
+        search_row.addWidget(self.search_field)
         search_btn = QtWidgets.QPushButton("Search")
+        search_btn.clicked.connect(self.apply_search)
+        search_row.addWidget(search_btn)
         clear_search_btn = QtWidgets.QPushButton("Clear")
+        clear_search_btn.clicked.connect(self.clear_search)
+        search_row.addWidget(clear_search_btn)
         self.include_all_cb = QtWidgets.QCheckBox("Include All Tags")
+        search_row.addWidget(self.include_all_cb)
         self.case_sensitive_cb = QtWidgets.QCheckBox("Case-Sensitive")
         self.case_sensitive_cb.setChecked(True)
-        clear_checks_btn = QtWidgets.QPushButton("Clear Checks")
-        search_btn.clicked.connect(self.apply_search)
-        clear_search_btn.clicked.connect(self.clear_search)
-        clear_checks_btn.clicked.connect(self.clear_checks)
-        search_row.addWidget(self.search_field)
-        search_row.addWidget(search_btn)
-        search_row.addWidget(clear_search_btn)
-        search_row.addWidget(self.include_all_cb)
         search_row.addWidget(self.case_sensitive_cb)
+        clear_checks_btn = QtWidgets.QPushButton("Clear Checks")
+        clear_checks_btn.clicked.connect(self.clear_checks)
         search_row.addWidget(clear_checks_btn)
+        # new button: check all shown
+        check_all_btn = QtWidgets.QPushButton("Check All Shown")
+        check_all_btn.clicked.connect(self.check_all_shown)
+        search_row.addWidget(check_all_btn)
         l.addLayout(search_row)
 
-        # Set creation row
+        # Set + Group creation row
         row = QtWidgets.QHBoxLayout()
         self.new_set_name = QtWidgets.QLineEdit()
         row.addWidget(self.new_set_name)
         btn_set = QtWidgets.QPushButton("Create Set from Checked")
         btn_set.clicked.connect(self.create_set)
         row.addWidget(btn_set)
+        btn_group = QtWidgets.QPushButton("Create Group from Checked")
+        btn_group.clicked.connect(self.create_group)
+        row.addWidget(btn_group)
         l.addLayout(row)
 
         # Scroll area for controls
@@ -194,52 +182,104 @@ class RigUI(QtWidgets.QDialog):
         self.scroll.setWidgetResizable(True)
         l.addWidget(self.scroll)
 
-        # gather and build controls
         all_children = cmds.listRelatives(self.root, allDescendents=True, fullPath=True) or []
         self.all_controls = sorted([c for c in all_children if matches(c.split('|')[-1], self.reqs, self.excs)])
         self.build_control_list(self.all_controls)
-
         return w
 
     def build_control_list(self, names):
-        # clear existing rows
         for row_w, _ in self.row_widgets:
             row_w.setParent(None)
         self.checks = []
         self.row_widgets = []
-
-        # rebuild rows
         for name in names:
-            row_widget = QtWidgets.QWidget()
-            row_layout = QtWidgets.QHBoxLayout(row_widget)
+            row = QtWidgets.QWidget()
+            hl = QtWidgets.QHBoxLayout(row)
             chk = QtWidgets.QCheckBox()
             btn = QtWidgets.QPushButton(name.split('|')[-1])
             btn.clicked.connect(partial(cmds.select, name, add=True))
-            row_layout.addWidget(chk)
-            row_layout.addWidget(btn)
-            self.form.addWidget(row_widget)
+            hl.addWidget(chk)
+            hl.addWidget(btn)
+            self.form.addWidget(row)
             self.checks.append((chk, name))
-            self.row_widgets.append((row_widget, name))
+            self.row_widgets.append((row, name))
+
+    def check_all_shown(self):
+        # check every checkbox whose row is visible
+        for (chk, name), (row_w, _) in zip(self.checks, self.row_widgets):
+            if row_w.isVisible():
+                chk.setChecked(True)
+
+    def create_set(self):
+        name = self.new_set_name.text().strip()
+        if not name:
+            return
+        items = [n for chk,n in self.checks if chk.isChecked()]
+        if not items:
+            return
+        self.selection_sets[name] = items
+        btn = QtWidgets.QPushButton(name)
+        btn.clicked.connect(partial(cmds.select, items, add=True))
+        self.sets_layout.addWidget(btn)
+
+    def _make_sets_tab(self):
+        w = QtWidgets.QWidget()
+        scroll = QtWidgets.QScrollArea()
+        container = QtWidgets.QWidget()
+        self.sets_layout = QtWidgets.QVBoxLayout(container)
+        scroll.setWidget(container)
+        scroll.setWidgetResizable(True)
+        layout = QtWidgets.QVBoxLayout(w)
+        layout.addWidget(scroll)
+        return w
+
+    def _make_groups_tab(self):
+        w = QtWidgets.QWidget()
+        scroll = QtWidgets.QScrollArea()
+        container = QtWidgets.QWidget()
+        self.groups_layout = QtWidgets.QVBoxLayout(container)
+        scroll.setWidget(container)
+        scroll.setWidgetResizable(True)
+        layout = QtWidgets.QVBoxLayout(w)
+        layout.addWidget(scroll)
+        return w
+
+    def create_group(self):
+        name = self.new_set_name.text().strip()
+        if not name:
+            return
+        items = [n for chk,n in self.checks if chk.isChecked()]
+        if not items:
+            return
+        self.groups[name] = items
+        box = QtWidgets.QGroupBox(name)
+        box.setCheckable(True)
+        box.setChecked(True)
+        v = QtWidgets.QVBoxLayout(box)
+        for full in items:
+            btn = QtWidgets.QPushButton(full.split('|')[-1])
+            btn.clicked.connect(partial(cmds.select, full, add=True))
+            v.addWidget(btn)
+        def toggle_children(on):
+            for i in range(v.count()):
+                v.itemAt(i).widget().setVisible(on)
+        box.toggled.connect(toggle_children)
+        self.groups_layout.addWidget(box)
 
     def apply_search(self):
         terms = [t.strip() for t in self.search_field.text().split(',') if t.strip()]
         case = self.case_sensitive_cb.isChecked()
         include_all = self.include_all_cb.isChecked()
         if not terms:
-            # nothing to filter: show all
             for row_w, _ in self.row_widgets:
                 row_w.setVisible(True)
             return
-        # normalize terms if case-insensitive
         if not case:
             terms = [t.lower() for t in terms]
         for row_w, full in self.row_widgets:
             base = full.split('|')[-1]
             test = base if case else base.lower()
-            if include_all:
-                show = all(term in test for term in terms)
-            else:
-                show = any(term in test for term in terms)
+            show = all(term in test for term in terms) if include_all else any(term in test for term in terms)
             row_w.setVisible(show)
 
     def clear_search(self):
@@ -251,26 +291,8 @@ class RigUI(QtWidgets.QDialog):
         for chk, _ in self.checks:
             chk.setChecked(False)
 
-    def _make_sets_tab(self):
-        w = QtWidgets.QWidget()
-        self.sets_layout = QtWidgets.QVBoxLayout(w)
-        return w
-
-    def create_set(self):
-        name = self.new_set_name.text().strip()
-        if not name:
-            return
-        items = [n for chk,n in self.checks if chk.isChecked()]
-        if not items:
-            return
-        self.selection_sets[name] = items
-        # add button to sets tab; use partial to capture item list
-        btn = QtWidgets.QPushButton(name)
-        btn.clicked.connect(partial(cmds.select, items, replace=True))
-        self.sets_layout.addWidget(btn)
-
-
 # launch
+
 def show_rig_selector_ui():
     try:
         for w in QtWidgets.QApplication.allWidgets():
