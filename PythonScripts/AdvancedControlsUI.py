@@ -137,6 +137,121 @@ class CubeShape(BaseShape):
         master = cmds.rename(master, name)
         return master
 
+class TriangleShape(BaseShape):
+    """
+    Equilateral triangle centered at origin.
+    """
+    def __init__(self, size=1.0):
+        self.s = size
+
+    def create(self, name):
+        h = math.sqrt(3) * self.s  # height of equilateral
+        pts = [
+            ( 0,    0,  h/2),
+            (-self.s, 0, -h/2),
+            ( self.s, 0, -h/2),
+            ( 0,    0,  h/2),
+        ]
+        return cmds.curve(name=name, p=pts, degree=1)
+
+
+class HexagonShape(BaseShape):
+    """
+    Regular hexagon centered at origin.
+    """
+    def __init__(self, radius=1.0):
+        self.r = radius
+
+    def create(self, name):
+        pts = []
+        for i in range(6):
+            angle = 2*math.pi * (i/6.0)
+            x = self.r * math.cos(angle)
+            z = self.r * math.sin(angle)
+            pts.append((x, 0, z))
+        pts.append(pts[0])
+        return cmds.curve(name=name, p=pts, degree=1)
+
+
+class HeartShape(BaseShape):
+    """
+    Stylized heart via a classic 2D parametric formula.
+    """
+    def __init__(self, scale=0.1, samples=64):
+        self.a = scale
+        self.samples = samples
+
+    def create(self, name):
+        pts = []
+        for i in range(self.samples+1):
+            t = math.pi * 2 * (i/float(self.samples))
+            x = self.a * 16 * math.sin(t)**3
+            z = self.a * (13*math.cos(t) - 5*math.cos(2*t)
+                          - 2*math.cos(3*t) - math.cos(4*t))
+            pts.append((x, 0, z))
+        return cmds.curve(name=name, p=pts, degree=3)
+
+
+class TeardropShape(BaseShape):
+    """
+    Teardrop outline via (1 - sin t) polar eq.
+    """
+    def __init__(self, scale=1.0, samples=64):
+        self.a = scale
+        self.samples = samples
+
+    def create(self, name):
+        pts = []
+        for i in range(self.samples+1):
+            t = math.pi * 2 * (i/float(self.samples))
+            r = self.a * (1 - math.sin(t))
+            x = r * math.cos(t)
+            z = r * math.sin(t)
+            pts.append((x, 0, z))
+        return cmds.curve(name=name, p=pts, degree=3)
+
+
+class LeafShape(BaseShape):
+    """
+    Symmetric leaf formed by two teardrops mirrored.
+    """
+    def __init__(self, scale=1.0, samples=64):
+        self.a = scale
+        self.samples = samples
+
+    def create(self, name):
+        pts = []
+        # first half
+        for i in range(self.samples+1):
+            t = math.pi * (i/float(self.samples))
+            x = self.a * math.sin(t)
+            z = self.a * math.sin(t) * math.cos(t)
+            pts.append(( x, 0,  z))
+        # second half (mirror back)
+        for i in range(self.samples+1):
+            t = math.pi * (1 - (i/float(self.samples)))
+            x = -self.a * math.sin(t)
+            z = self.a * math.sin(t) * math.cos(t)
+            pts.append(( x, 0,  z))
+        return cmds.curve(name=name, p=pts, degree=3, periodic=True)
+
+
+class FigureEightShape(BaseShape):
+    """
+    Lemniscate of Gerono (∞) as a smooth loop.
+    """
+    def __init__(self, scale=1.0, samples=64):
+        self.a = scale
+        self.samples = samples
+
+    def create(self, name):
+        pts = []
+        for i in range(self.samples+1):
+            t = math.pi * 2 * (i/float(self.samples))
+            x = self.a * math.cos(t)
+            z = self.a * math.sin(t) * math.cos(t)
+            pts.append((x, 0, z))
+        return cmds.curve(name=name, p=pts, degree=3, periodic=True)
 
 
 # -------------------------------------------------
@@ -145,9 +260,21 @@ class CubeShape(BaseShape):
 class ControlManager(object):
     def __init__(self):
         self.shapes = {
-            'Circle': CircleShape(), 'Square': SquareShape(), 'Arrow': ArrowShape(),
-            'Diamond': DiamondShape(), 'Plus': PlusShape(), 'Gear': GearShape(),
-            'Starburst': StarburstShape(), 'Astroid': AstroidShape(), 'Cube': CubeShape()
+            'Circle': CircleShape(),
+            'Square': SquareShape(),
+            'Arrow': ArrowShape(),
+            'Diamond': DiamondShape(),
+            'Plus': PlusShape(),
+            'Gear': GearShape(),
+            'Starburst': StarburstShape(),
+            'Astroid': AstroidShape(),
+            'Cube': CubeShape(),
+            'Triangle': TriangleShape(),
+            'Hexagon': HexagonShape(),
+            'Heart': HeartShape(),
+            'Teardrop': TeardropShape(),
+            'Leaf': LeafShape(),
+            'Figure Eight': FigureEightShape()
         }
 
     def create_control(self, shape_name, ctrl_name, target=None, color=None):
