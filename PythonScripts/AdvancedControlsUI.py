@@ -68,6 +68,76 @@ class StarburstShape(BaseShape):
             r = r_spike if i%2==0 else r_base
             pts.append((r*math.cos(angle),0,r*math.sin(angle)))
         return cmds.curve(name=name, p=pts, degree=1)
+        
+class AstroidShape(BaseShape):
+    """
+    Closed, smooth astroid/tetracuspid curve:
+      x = a * cos^3(t)
+      z = a * sin^3(t)
+    Approximated with a degree-3 open curve (first 3 pts re-used to close it).
+    """
+    def __init__(self, scale=1.0, samples=64):
+        self.a = scale
+        self.samples = samples
+
+    def create(self, name):
+        # generate one full loop of astroid
+        pts = []
+        for i in range(self.samples):
+            t = (math.pi * 2) * (i / float(self.samples))
+            x = self.a * math.cos(t)**3
+            z = self.a * math.sin(t)**3
+            pts.append((x, 0, z))
+        # to close smoothly with degree=3, repeat first 3 pts
+        pts.extend(pts[:3])
+        return cmds.curve(name=name, p=pts, degree=3)
+
+class CubeShape(BaseShape):
+    """
+    Wireframe cube: creates 12 separate edge curves, then re-parents
+    all their shape nodes onto the first curve transform using
+    cmds.parent(..., r=True, s=True), and deletes the empty transforms.
+    """
+    def __init__(self, size=1.0):
+        self.s = size
+
+    def create(self, name):
+        s = self.s
+        # corner positions
+        C = {
+            'FBL': (-s, -s,  s), 'FBR': ( s, -s,  s),
+            'FTR': ( s,  s,  s), 'FTL': (-s,  s,  s),
+            'BBL': (-s, -s, -s), 'BBR': ( s, -s, -s),
+            'BTR': ( s,  s, -s), 'BTL': (-s,  s, -s),
+        }
+        edges = [
+            ('FBL','FBR'),('FBR','FTR'),('FTR','FTL'),('FTL','FBL'),
+            ('BBL','BBR'),('BBR','BTR'),('BTR','BTL'),('BTL','BBL'),
+            ('FBL','BBL'),('FBR','BBR'),('FTR','BTR'),('FTL','BTL'),
+        ]
+
+        # Create all edge curves
+        curves = []
+        for i, (a, b) in enumerate(edges):
+            pts = [C[a], C[b]]
+            crv = cmds.curve(name=f"{name}_edge{i}", p=pts, degree=1)
+            curves.append(crv)
+
+        # Use the first curve as the master transform
+        master = curves[0]
+
+        # For each subsequent curve, move its shape(s) under master, then delete it
+        for crv in curves[1:]:
+            shapes = cmds.listRelatives(crv, shapes=True, fullPath=True) or []
+            for shp in shapes:
+                cmds.parent(shp, master, r=True, s=True)
+            cmds.delete(crv)
+
+        # Rename the master to the requested name (if needed)
+        master = cmds.rename(master, name)
+        return master
+
+
 
 # -------------------------------------------------
 # Control Manager with Color Support
@@ -77,7 +147,7 @@ class ControlManager(object):
         self.shapes = {
             'Circle': CircleShape(), 'Square': SquareShape(), 'Arrow': ArrowShape(),
             'Diamond': DiamondShape(), 'Plus': PlusShape(), 'Gear': GearShape(),
-            'Starburst': StarburstShape(),
+            'Starburst': StarburstShape(), 'Astroid': AstroidShape(), 'Cube': CubeShape()
         }
 
     def create_control(self, shape_name, ctrl_name, target=None, color=None):
