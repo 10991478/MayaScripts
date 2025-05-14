@@ -44,12 +44,19 @@ class PlusShape(BaseShape):
 
 class GearShape(BaseShape):
     def create(self, name):
-        teeth = 12; r_outer = 1.0; r_inner = 0.7
+        # A simple cog with paired teeth (two points per outer/inner alternation)
+        teeth = 16
+        r_outer = 1.0
+        r_inner = 0.7
         pts = []
-        for i in range(teeth*2+1):
-            angle = (math.pi*2)*(i/float(teeth*2))
-            r = r_outer if i%2==0 else r_inner
-            pts.append((r*math.cos(angle),0,r*math.sin(angle)))
+        total = teeth * 2
+        for i in range(total + 1):
+            angle = (math.pi * 2) * (i / float(total))
+            group = i // 2
+            r = r_outer if (group % 2 == 0) else r_inner
+            x = r * math.cos(angle)
+            z = r * math.sin(angle)
+            pts.append((x, 0, z))
         return cmds.curve(name=name, p=pts, degree=1)
 
 class StarburstShape(BaseShape):
@@ -135,7 +142,7 @@ class ControlManager(object):
             if color is not None: self._apply_color(short_old, color)
 
 # -----------------------------
-# UI Definition with Corrected Color Picker Offset
+# UI Definition with Color Picker
 # -----------------------------
 class ControlUI(object):
     WINDOW = "controlReplaceWindow"
@@ -167,7 +174,7 @@ class ControlUI(object):
         cmds.text(label="Suffix");  self.suffix_field = cmds.textField()
         cmds.setParent('..')
 
-        # Color Settings with Picker (corrected offset)
+        # Color Settings with Picker
         cmds.separator(height=10)
         cmds.text(label="Color Index (0-31):")
         self.color_slider = cmds.colorIndexSliderGrp(label='Pick Color:', min=0, max=31, value=17)
@@ -184,7 +191,6 @@ class ControlUI(object):
         cmds.showWindow(self.win)
 
     def _get_color_index(self):
-        # colorIndexSliderGrp returns 1-based; offset to 0-based Maya override
         picked = cmds.colorIndexSliderGrp(self.color_slider, query=True, value=True)
         return max(0, picked - 1)
 
