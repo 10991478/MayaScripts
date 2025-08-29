@@ -1,12 +1,15 @@
 """
-Select 3 joints in a hierarchy in hierarchy order to orient them for IK
+Select 3 joints in a hierarchy, starting with parent going to child, to orient joints orthogonally and ready for IK
 """
 
 import maya.cmds as cmds
 import math
 
-WINDOW_NAME = "orientThreeJointsWin_unparent_fix"
+WINDOW_NAME = "threeJointOrthoOrientWin_v3"
 
+# -------------------
+# Vector helpers
+# -------------------
 def vec_sub(a, b): return [a[i] - b[i] for i in range(3)]
 def vec_add(a, b): return [a[i] + b[i] for i in range(3)]
 def vec_mul(a, s): return [a[i] * s for i in range(3)]
@@ -20,6 +23,9 @@ def vec_cross(a, b):
             a[2]*b[0] - a[0]*b[2],
             a[0]*b[1] - a[1]*b[0]]
 
+# -------------------
+# Axis maps
+# -------------------
 AXIS_MAP = {
     '+X': (1,0,0), '-X': (-1,0,0),
     '+Y': (0,1,0), '-Y': (0,-1,0),
@@ -27,6 +33,9 @@ AXIS_MAP = {
 }
 AXIS_ABS = {'+X':(1,0,0), '-X':(1,0,0), '+Y':(0,1,0), '-Y':(0,1,0), '+Z':(0,0,1), '-Z':(0,0,1)}
 
+# -------------------
+# Utility / validation
+# -------------------
 def warn(msg):
     cmds.warning(msg)
     try:
@@ -58,6 +67,42 @@ def compute_plane_normal(p1, p2, p3):
         return None
     return vec_normalize(n)
 
+# -------------------
+# Axis display toggle
+# -------------------
+def toggle_joint_axis_display():
+    """
+    Toggle displayLocalAxis on selected joints, or on all joints if none selected.
+    """
+    joints_sel = cmds.ls(sl=True, type='joint')
+    if not joints_sel:
+        joints_sel = cmds.ls(type='joint') or []
+        if not joints_sel:
+            cmds.inViewMessage(amg='No joints found to toggle axis display.', pos='topCenter', fade=True)
+            return
+
+    turn_off = False
+    for j in joints_sel:
+        try:
+            val = cmds.getAttr(j + ".displayLocalAxis")
+            if val:
+                turn_off = True
+                break
+        except Exception:
+            continue
+
+    for j in joints_sel:
+        try:
+            cmds.setAttr(j + ".displayLocalAxis", 0 if turn_off else 1)
+        except Exception:
+            pass
+
+    cmds.inViewMessage(amg=('Joint Local Rotation Axes %s' % ('Hidden' if turn_off else 'Shown')),
+                       pos='topCenter', fade=True)
+
+# -------------------
+# Core orient routine
+# -------------------
 def orient_chain(primary_choice, secondary_choice):
     sel = cmds.ls(sl=True)
     if not validate_selection(sel):
@@ -69,7 +114,7 @@ def orient_chain(primary_choice, secondary_choice):
     orig_parent_j2 = (cmds.listRelatives(j2, parent=True) or [None])[0]
     orig_parent_j3 = (cmds.listRelatives(j3, parent=True) or [None])[0]
 
-    # read positions first (so temp locators get constant world positions)
+    # read world positions first
     p1 = cmds.xform(j1, q=True, ws=True, t=True)
     p2 = cmds.xform(j2, q=True, ws=True, t=True)
     p3 = cmds.xform(j3, q=True, ws=True, t=True)
@@ -79,7 +124,7 @@ def orient_chain(primary_choice, secondary_choice):
         warn("Selected joints appear collinear or too close — cannot compute a stable plane normal.")
         return
 
-    # validate axes (can't pick same axis ignoring sign)
+    # axis validation (ignoring sign)
     if primary_choice[1] == secondary_choice[1]:
         warn("Primary and secondary axes cannot be the same axis (ignoring sign). Pick orthogonal axes.")
         return
@@ -95,39 +140,35 @@ def orient_chain(primary_choice, secondary_choice):
         cmds.undoInfo(openChunk=True)
         opened_chunk = True
 
-        # Unparent all three to world (preserve world transform)
-        # This prevents j2/j3 from moving when j1 gets reoriented.
+        # Unparent chain to world to prevent children from moving when parent rotates
         for j in (j1, j2, j3):
             try:
                 cmds.parent(j, world=True)
             except Exception:
-                # if already world or cannot, ignore and continue
                 pass
 
-        # Zero jointOrient first (if locked this will fail and we warn)
+        # Zero jointOrient (fail if locked)
         for j in (j1, j2, j3):
             try:
                 cmds.setAttr(j + ".jointOrient", 0, 0, 0)
             except Exception:
                 warn("Could not zero jointOrient for %s — attribute may be locked." % j)
-                # attempt to restore parents before exiting
-                # break out by raising
-                raise
+                raise RuntimeError("jointOrient locked on %s" % j)
 
-        # create world-space locators to aim at (no chance of cycles)
-        loc_j2 = cmds.spaceLocator(name='__orient_temp_loc_j2__')[0]
-        loc_j3 = cmds.spaceLocator(name='__orient_temp_loc_j3__')[0]
+        # Create world-space locators as aim targets (avoid cycles)
+        loc_j2 = cmds.spaceLocator(name='__tmp_orient_loc_j2__')[0]
+        loc_j3 = cmds.spaceLocator(name='__tmp_orient_loc_j3__')[0]
         temp_nodes.extend([loc_j2, loc_j3])
         cmds.xform(loc_j2, ws=True, t=p2)
         cmds.xform(loc_j3, ws=True, t=p3)
 
-        # create offset locator for j3 aim direction (j3 -> direction from j2->j3)
+        # j3 offset locator for aim direction (using j2->j3)
         desired_primary_vec = vec_sub(p3, p2)
         if vec_length(desired_primary_vec) < 1e-6:
             desired_primary_vec = [1.0, 0.0, 0.0]
         desired_primary_vec = vec_normalize(desired_primary_vec)
         dist = vec_length(vec_sub(p3, p2)) or 1.0
-        loc_j3_offset = cmds.spaceLocator(name='__orient_temp_loc_j3_dir__')[0]
+        loc_j3_offset = cmds.spaceLocator(name='__tmp_orient_loc_j3_dir__')[0]
         temp_nodes.append(loc_j3_offset)
         cmds.xform(loc_j3_offset, ws=True, t=vec_add(p3, vec_mul(desired_primary_vec, dist)))
 
@@ -155,7 +196,7 @@ def orient_chain(primary_choice, secondary_choice):
         cmds.setAttr(j2 + ".jointOrient", rot2[0], rot2[1], rot2[2])
         cmds.setAttr(j2 + ".rotate", 0, 0, 0)
 
-        # Aim j3 at loc_j3_offset
+        # Aim j3 at offset locator
         c3 = cmds.aimConstraint(loc_j3_offset, j3,
                                 aimVector=aimVec,
                                 upVector=upVec_local,
@@ -167,32 +208,27 @@ def orient_chain(primary_choice, secondary_choice):
         cmds.setAttr(j3 + ".jointOrient", rot3[0], rot3[1], rot3[2])
         cmds.setAttr(j3 + ".rotate", 0, 0, 0)
 
-        # Restore original parenting in order: root, middle, leaf.
-        # Use cmds.parent(child, parent) which preserves world transforms by default.
+        # Restore original parenting (root, middle, leaf)
         try:
             if orig_parent_j1:
                 cmds.parent(j1, orig_parent_j1)
         except Exception:
-            cmds.warning("Failed to reparent %s to its original parent %s" % (j1, str(orig_parent_j1)))
-
+            cmds.warning("Failed to reparent %s to original parent %s" % (j1, str(orig_parent_j1)))
         try:
             if orig_parent_j2:
                 cmds.parent(j2, orig_parent_j2)
         except Exception:
-            # If original parent was the original j1, it has been restored above.
-            cmds.warning("Failed to reparent %s to its original parent %s" % (j2, str(orig_parent_j2)))
-
+            cmds.warning("Failed to reparent %s to original parent %s" % (j2, str(orig_parent_j2)))
         try:
             if orig_parent_j3:
                 cmds.parent(j3, orig_parent_j3)
         except Exception:
-            cmds.warning("Failed to reparent %s to its original parent %s" % (j3, str(orig_parent_j3)))
+            cmds.warning("Failed to reparent %s to original parent %s" % (j3, str(orig_parent_j3)))
 
     except Exception as e:
-        # If an exception occurred (e.g., locked attrs), ensure we still try to cleanup and restore parents
         cmds.warning("Orienting failed: %s" % str(e))
     finally:
-        # cleanup temp locators
+        # cleanup temp nodes
         for n in temp_nodes:
             if cmds.objExists(n):
                 try:
@@ -205,37 +241,60 @@ def orient_chain(primary_choice, secondary_choice):
             except Exception:
                 pass
 
-    # re-select original joints and notify
     cmds.select(sel)
     cmds.inViewMessage(amg='Oriented joints: <hl>%s, %s, %s</hl>' % tuple(sel), pos='topCenter', fade=True)
 
+# -------------------
 # UI
+# -------------------
 def show_ui():
     if cmds.window(WINDOW_NAME, exists=True):
-        cmds.deleteUI(WINDOW_NAME)
-    win = cmds.window(WINDOW_NAME, title="Orient 3-Joint Chain (Unparent Fix)", widthHeight=(400,160), sizeable=False)
-    cmds.columnLayout(adjustableColumn=True, columnAlign='center', rowSpacing=6, columnAttach=('both', 6))
+        try:
+            cmds.deleteUI(WINDOW_NAME)
+        except Exception:
+            pass
+
+    win = cmds.window(WINDOW_NAME, title="3-Joint Orthogonal Orientation Tool", sizeable=True, widthHeight=(420,180))
+
+    # Simple column and row layouts which behave well when window is sizeable
+    cmds.columnLayout(adjustableColumn=True, rowSpacing=8, columnAlign='center', columnAttach=('both', 8))
     cmds.text(label="Select exactly 3 joints in hierarchy order (parent -> child -> grandchild).", align='center')
 
-    cmds.rowLayout(numberOfColumns=2, columnWidth2=(200,200), columnAlign2=('left','left'), columnAttach2=('both','both'))
+    # Primary axis
+    cmds.rowLayout(numberOfColumns=2, columnWidth2=(220,180), adjustableColumn=1)
     cmds.text(label="Primary axis (aim down chain):", align='left')
-    primary_menu = cmds.optionMenu('primaryMenu_upf')
+    prim_menu = cmds.optionMenu('primMenu_v3')
     for opt in ['+X','-X','+Y','-Y','+Z','-Z']:
         cmds.menuItem(label=opt)
     cmds.setParent('..')
 
-    cmds.rowLayout(numberOfColumns=2, columnWidth2=(200,200), columnAlign2=('left','left'), columnAttach2=('both','both'))
+    # Secondary axis (default to +Z)
+    cmds.rowLayout(numberOfColumns=2, columnWidth2=(220,180), adjustableColumn=1)
     cmds.text(label="Secondary axis (orthogonal to joint plane):", align='left')
-    secondary_menu = cmds.optionMenu('secondaryMenu_upf')
+    sec_menu = cmds.optionMenu('secMenu_v3')
     for opt in ['+X','-X','+Y','-Y','+Z','-Z']:
         cmds.menuItem(label=opt)
+    try:
+        cmds.optionMenu(sec_menu, e=True, value='+Z')
+    except Exception:
+        pass
     cmds.setParent('..')
 
-    cmds.separator(height=8, style='in')
+    cmds.separator(height=6, style='in')
 
-    def on_orient(*args):
-        primary_choice = cmds.optionMenu('primaryMenu_upf', q=True, value=True)
-        secondary_choice = cmds.optionMenu('secondaryMenu_upf', q=True, value=True)
+    # Buttons row
+    cmds.rowLayout(numberOfColumns=3, columnWidth3=(140,200,80), adjustableColumn=2)
+    cmds.button(label="Orient Joints", height=36, command=lambda *a: _on_orient())
+    cmds.button(label="Toggle Joint Axis Visibility", height=36, command=lambda *a: toggle_joint_axis_display())
+    cmds.button(label="Close", height=36, command=lambda *a: cmds.deleteUI(win))
+    cmds.setParent('..')
+
+    cmds.showWindow(win)
+
+    # local helper for orient button so we can query optionMenus
+    def _on_orient():
+        primary_choice = cmds.optionMenu('primMenu_v3', q=True, value=True)
+        secondary_choice = cmds.optionMenu('secMenu_v3', q=True, value=True)
         sel = cmds.ls(sl=True)
         if not sel or len(sel) != 3:
             warn("Please select exactly 3 joints before pressing Orient.")
@@ -245,12 +304,5 @@ def show_ui():
             return
         orient_chain(primary_choice, secondary_choice)
 
-    cmds.rowLayout(numberOfColumns=2, columnWidth2=(200,200), columnAlign2=('center','center'))
-    cmds.button(label="Orient Joints", height=36, command=on_orient)
-    cmds.button(label="Close", height=36, command=lambda *a: cmds.deleteUI(win))
-    cmds.setParent('..')
-
-    cmds.showWindow(win)
-
-# Show the UI immediately when this script runs
+# show UI immediately
 show_ui()
