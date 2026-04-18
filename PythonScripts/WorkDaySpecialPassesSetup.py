@@ -195,6 +195,68 @@ def set_frame_range_from_timeline(*_):
     except Exception as e:
         cmds.warning("Could not set frame range from Time Slider: {}".format(e))
 
+def set_render_camera_from_view(*_):
+    """
+    Sets the renderable camera to the camera currently active in the focused model panel.
+    Makes sure only that camera is renderable.
+    """
+    panel = cmds.getPanel(withFocus=True)
+
+    if not panel or not cmds.getPanel(typeOf=panel) == "modelPanel":
+        cmds.warning("Focus a viewport first, then press Set Render Camera.")
+        return
+
+    try:
+        cam = cmds.modelEditor(panel, q=True, camera=True)
+    except Exception as e:
+        cmds.warning("Could not query active camera: {}".format(e))
+        return
+
+    if not cam or not cmds.objExists(cam):
+        cmds.warning("No valid camera found in the active viewport.")
+        return
+
+    # modelEditor can return either the transform or the shape; normalize to both.
+    cam_shape = cam
+    cam_transform = cam
+
+    if cmds.nodeType(cam) == "camera":
+        parents = cmds.listRelatives(cam, parent=True, fullPath=True) or []
+        cam_shape = cam
+        cam_transform = parents[0] if parents else None
+    else:
+        shapes = cmds.listRelatives(cam, shapes=True, fullPath=True, type="camera") or []
+        if shapes:
+            cam_shape = shapes[0]
+        cam_transform = cam
+
+    # Turn off renderable on all cameras first
+    for shape in cmds.ls(type="camera", long=True) or []:
+        try:
+            cmds.setAttr(shape + ".renderable", 0)
+        except Exception:
+            pass
+
+    # Turn on only the active one
+    target_shape = cam_shape if cmds.nodeType(cam_shape) == "camera" else None
+    if not target_shape and cam_transform:
+        shapes = cmds.listRelatives(cam_transform, shapes=True, fullPath=True, type="camera") or []
+        target_shape = shapes[0] if shapes else None
+
+    if not target_shape or not cmds.objExists(target_shape):
+        cmds.warning("Could not resolve the render camera shape.")
+        return
+
+    try:
+        cmds.setAttr(target_shape + ".renderable", 1)
+        cmds.inViewMessage(
+            amg='Render camera set to "{}".'.format(target_shape),
+            pos="topCenter",
+            fade=True
+        )
+    except Exception as e:
+        cmds.warning("Could not set renderable camera: {}".format(e))
+
 
 def setup_pass(pass_name, material_name, *_):
     _set_render_version(pass_name)
@@ -249,6 +311,12 @@ def show_special_pass_setup_ui():
         label="Set Frame Range",
         height=30,
         command=set_frame_range_from_timeline
+    )
+
+    cmds.button(
+        label="Set Render Camera",
+        height=30,
+        command=set_render_camera_from_view
     )
 
     cmds.separator(height=10, style="in")
