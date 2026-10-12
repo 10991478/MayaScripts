@@ -1,6 +1,4 @@
-# Tool for filtering your current selection, now with reparenting capabilities
-# Filter Selection Tool v6.4_fix2 — layout flag error fixed (removed invalid columnWidth7)
-
+# Tool for advanced selection and reparenting
 
 import re
 import maya.cmds as cmds
@@ -20,7 +18,6 @@ def filter_selection_ui_v6_4_fix2():
     OPT_SUFFIX = "fs_v6_suffix"
     OPT_ORDER = "fs_v6_order"
     OPT_NUMERIC_SORT = "fs_v6_numeric_sort"
-    OPT_AUTO_SCAN = "fs_v6_auto_scan_chains"
 
     def opt_get(key, default):
         try:
@@ -156,7 +153,6 @@ def filter_selection_ui_v6_4_fix2():
     saved_suffix = opt_get(OPT_SUFFIX, "")
     saved_order = opt_get(OPT_ORDER, "increasing")
     saved_numeric_sort = bool(int(opt_get(OPT_NUMERIC_SORT, 1)))
-    saved_auto_scan = bool(int(opt_get(OPT_AUTO_SCAN, 1)))
 
     cmds.text(label="Numbering-based options (prefix + number + suffix):", align="left")
     cmds.rowLayout(numberOfColumns=2, columnWidth2=[200,560])
@@ -169,8 +165,7 @@ def filter_selection_ui_v6_4_fix2():
     cmds.setParent("..")
 
     # FIX: do not pass an invalid columnWidth7 flag — use columnAttach to space columns instead
-    cmds.rowLayout(numberOfColumns=7, columnAttach=[(1, "left", 6), (2, "both", 6), (3, "both", 6),
-                                                   (4, "both", 6), (5, "both", 6), (6, "both", 6), (7, "both", 6)])
+    cmds.rowLayout(numberOfColumns=3, columnAttach=[(1, "left", 6), (2, "both", 6), (3, "both", 6)])
     cmds.text(label="Ordering:")
     order_option = cmds.optionMenu()
     cmds.menuItem(label="increasing"); cmds.menuItem(label="decreasing")
@@ -179,16 +174,6 @@ def filter_selection_ui_v6_4_fix2():
     except Exception:
         pass
     numeric_sort_cb = cmds.checkBox(label="Sort numbers as integers (01→1)", value=saved_numeric_sort)
-    auto_scan_cb = cmds.checkBox(label="Auto-scan distinct bases → one chain per base", value=saved_auto_scan)
-    cmds.text(label="Apply chains:")
-    apply_all_checkbox = cmds.checkBox(label="Apply ALL chains", value=True)
-    chain_index_field = cmds.intField(value=1, minValue=1)
-    cmds.setParent("..")
-
-    cmds.rowLayout(numberOfColumns=3, columnWidth3=[280,280,240])
-    create_missing_parents_cb = cmds.checkBox(label="Create missing parent transforms (for group root)", value=True)
-    reparent_root_field = cmds.textField(text="", placeholderText="Optional parent for created groups (full path)", width=280)
-    prevent_cycles_checkbox = cmds.checkBox(label="Prevent cycles (recommended)", value=True)
     cmds.setParent("..")
 
     cmds.separator(h=6)
@@ -369,14 +354,11 @@ def filter_selection_ui_v6_4_fix2():
         suffix = cmds.textField(suffix_field, q=True, text=True) or ""
         ordering = cmds.optionMenu(order_option, q=True, value=True)
         numeric_sort_as_int = bool(cmds.checkBox(numeric_sort_cb, q=True, value=True))
-        auto_scan = bool(cmds.checkBox(auto_scan_cb, q=True, value=True))
-
         # persist prefs
         opt_set(OPT_PREFIX, prefix)
         opt_set(OPT_SUFFIX, suffix)
         opt_set(OPT_ORDER, ordering)
         opt_set(OPT_NUMERIC_SORT, int(numeric_sort_as_int))
-        opt_set(OPT_AUTO_SCAN, int(auto_scan))
 
         pat = r"^" + re.escape(prefix) + r"(\d+)" + re.escape(suffix) + r"$"
         regex = re.compile(pat)
@@ -405,12 +387,8 @@ def filter_selection_ui_v6_4_fix2():
             return [], unmatched
 
         groups = {}
-        if auto_scan:
-            for base, num_key, node, num_text in matched:
-                groups.setdefault(base, []).append((num_key, node, num_text))
-        else:
-            key = "_ALL_"
-            groups[key] = [(num_key, node, num_text) for (_, num_key, node, num_text) in matched]
+        for base, num_key, node, num_text in matched:
+            groups.setdefault(base, []).append((num_key, node, num_text))
 
         chains = []
         reverse = (ordering == "decreasing")
@@ -477,12 +455,6 @@ def filter_selection_ui_v6_4_fix2():
         if not sel:
             cmds.warning("Nothing selected for reparenting."); return
         method = cmds.optionMenu(method_menu, q=True, value=True)
-        create_missing = cmds.checkBox(create_missing_parents_cb, q=True, value=True)
-        reparent_root = cmds.textField(reparent_root_field, q=True, text=True) or ""
-        prevent_cycles = bool(cmds.checkBox(prevent_cycles_checkbox, q=True, value=True))
-        apply_all = bool(cmds.checkBox(apply_all_checkbox, q=True, value=True))
-        chain_index = cmds.intField(chain_index_field, q=True, value=True)
-
         if "Name-based" in method:
             plan, unassigned = plan_name_based_reparent(sel)
             if not plan and not unassigned:
@@ -495,10 +467,9 @@ def filter_selection_ui_v6_4_fix2():
                 for kid in kids:
                     if not cmds.objExists(kid):
                         continue
-                    if prevent_cycles:
-                        if parent_node == kid: continue
-                        descendants = cmds.listRelatives(kid, ad=True, fullPath=True) or []
-                        if parent_node in descendants: continue
+                    if parent_node == kid: continue
+                    descendants = cmds.listRelatives(kid, ad=True, fullPath=True) or []
+                    if parent_node in descendants: continue
                     try:
                         cmds.parent(kid, parent_node)
                         applied += 1
@@ -513,17 +484,8 @@ def filter_selection_ui_v6_4_fix2():
             if not chains:
                 cmds.warning("No numeric matches found for given prefix/suffix."); return
 
-            chosen_chains = []
-            if apply_all:
-                chosen_chains = chains
-            else:
-                if chain_index < 1 or chain_index > len(chains):
-                    cmds.warning(f"Invalid chain index: {chain_index}. There are {len(chains)} chains. Set 'Apply ALL chains' or choose a valid index.")
-                    return
-                chosen_chains = [chains[chain_index - 1]]
-
             applied = 0
-            for chain_nodes, chain_info, base in chosen_chains:
+            for chain_nodes, chain_info, base in chains:
                 for i in range(len(chain_nodes) - 1, 0, -1):
                     child_node_orig = chain_nodes[i]
                     parent_node_orig = chain_nodes[i - 1]
@@ -531,12 +493,11 @@ def filter_selection_ui_v6_4_fix2():
                     child_r = resolve_transform_current(child_node_orig)
                     if not cmds.objExists(parent_r) or not cmds.objExists(child_r):
                         continue
-                    if prevent_cycles:
-                        if parent_r == child_r:
-                            continue
-                        descendants = cmds.listRelatives(child_r, ad=True, fullPath=True) or []
-                        if parent_r in descendants:
-                            continue
+                    if parent_r == child_r:
+                        continue
+                    descendants = cmds.listRelatives(child_r, ad=True, fullPath=True) or []
+                    if parent_r in descendants:
+                        continue
                     try:
                         cmds.parent(child_r, parent_r)
                         applied += 1

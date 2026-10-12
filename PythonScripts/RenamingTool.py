@@ -1,9 +1,9 @@
-# Maya Python Renaming Tool - Updated
+# Maya Python Advanced Renaming Tool - Updated
 
 import re
 import maya.cmds as cmds
 
-WINDOW_NAME = "simpleRenamerWindow_v2"
+WINDOW_NAME = "advancedRenamerWindow"
 
 def safe_int(field, default=0):
     try:
@@ -272,7 +272,7 @@ def print_preview_search_replace(search_field, replace_field, regex_checkbox, ca
                         newname = re.sub(re.escape(pattern), repl, s, flags=re.IGNORECASE)
         print("  %s  ->  %s" % (s, newname))
 
-# ------------------ Preview helpers (existing) ------------------
+# ------------------ Preview helpers ------------------
 
 def print_selection_names():
     sel = get_selection()

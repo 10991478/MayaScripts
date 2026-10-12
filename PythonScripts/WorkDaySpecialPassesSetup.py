@@ -165,9 +165,6 @@ def setup_general_render_settings(*_):
 
     if cmds.objExists("defaultArnoldDriver"):
         _set_attr_if_exists("defaultArnoldDriver.ai_translator", "exr", attr_type="string")
-
-    # Frame rate: 12 fps
-    # Maya often uses time unit names like "12fps" here.
     try:
         cmds.currentUnit(time="12fps")
     except Exception:
