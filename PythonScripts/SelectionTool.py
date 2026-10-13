@@ -208,29 +208,88 @@ def filter_selection_ui_v6_4_fix2():
         if not active_types and not include_groups:
             cmds.warning("No object types enabled."); return
         result = []
+        
+        
+        def is_light_node(node):
+            node_type = safe_node_type(node)
+
+            # Standard Maya light inheritance.
+            try:
+                if cmds.objectType(node, isAType="light"):
+                    return True
+            except Exception:
+                pass
+
+            # Arnold light shape types, such as aiAreaLight
+            # and aiSkyDomeLight.
+            type_lower = node_type.lower()
+            if type_lower.startswith("ai") and "light" in type_lower:
+                return True
+
+            return False
+
         for item in sel:
             nt = safe_node_type(item)
-            if nt == "joint" and "joint" in active_types:
-                result.append(item); continue
+
+            # Check shapes underneath selected transforms.
             if nt == "transform":
-                shapes = cmds.listRelatives(item, shapes=True, fullPath=True) or []
+                shapes = cmds.listRelatives(
+                    item, shapes=True, fullPath=True
+                ) or []
+
                 matched = False
-                for s in shapes:
-                    if safe_node_type(s) in active_types:
-                        result.append(item); matched = True; break
-                if matched: continue
-            if nt in active_types:
-                parents = cmds.listRelatives(item, parent=True, fullPath=True) or []
-                if parents: result.extend(parents)
-                else: result.append(item)
+                for shape in shapes:
+                    if (
+                        safe_node_type(shape) in active_types
+                        or ("light" in active_types and is_light_node(shape))
+                    ):
+                        result.append(item)
+                        matched = True
+                        break
+
+                if matched:
+                    continue
+
+            # Check directly selected shapes or nodes.
+            matches = nt in active_types
+
+            if "light" in active_types and is_light_node(item):
+                matches = True
+
+            if matches:
+                parents = cmds.listRelatives(
+                    item, parent=True, fullPath=True
+                ) or []
+
+                if parents:
+                    result.extend(parents)
+                else:
+                    result.append(item)
+
         if include_groups:
             for item in sel:
-                if safe_node_type(item) != "transform": continue
-                shapes = cmds.listRelatives(item, shapes=True) or []
-                if shapes: continue
-                descendants = cmds.listRelatives(item, ad=True, fullPath=True) or []
-                bad = any(safe_node_type(d) == "joint" or safe_node_type(d).lower().endswith("constraint") for d in descendants)
-                if not bad: result.append(item)
+                # Only transforms can qualify as groups.
+                if safe_node_type(item) != "transform":
+                    continue
+
+                # Get all direct children, including shapes.
+                children = cmds.listRelatives(
+                    item,
+                    children=True,
+                    fullPath=True
+                ) or []
+
+                # A group may contain other transforms, but it must
+                # not directly contain shapes, joints, or other nodes,
+                # with the exception of constraints.
+                is_group = all(
+                    safe_node_type(child) == "transform"
+                    or safe_node_type(child).lower().endswith("constraint")
+                    for child in children
+                )
+
+                if is_group:
+                    result.append(item)
         result = ordered_unique(result)
         if mode_keep:
             cmds.select(result, r=True); cmds.inViewMessage(amg=f"<hl>Type filter (keep) → {len(result)} objects</hl>", pos="topCenter", fade=True)
