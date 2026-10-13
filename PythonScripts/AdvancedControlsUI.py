@@ -238,7 +238,7 @@ class LeafShape(BaseShape):
 
 class FigureEightShape(BaseShape):
     """
-    Lemniscate of Gerono (∞) as a smooth loop.
+    Infinity sign
     """
     def __init__(self, scale=1.0, samples=64):
         self.a = scale
