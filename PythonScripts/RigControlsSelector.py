@@ -15,6 +15,17 @@ import maya.mel as mel
 
 CONFIG_FOLDER_NAME = "RigControlConfigs"
 
+# Keep Group pop-ups alive independently of their selector window.
+_GROUP_POPUPS = []
+
+
+def _forget_group_popup(popup):
+    """Remove a closed Group pop-up from the module-level reference list."""
+    try:
+        _GROUP_POPUPS.remove(popup)
+    except ValueError:
+        pass
+
 
 def get_maya_main_window():
     ptr = omui.MQtUtil.mainWindow()
@@ -424,13 +435,34 @@ class RigUI(QtWidgets.QDialog):
     def open_group_popup(self, name):
         items = self.groups.get(name, [])
         color = self.group_colors.get(name, "")
-        popup = QtWidgets.QDialog(self, QtCore.Qt.Tool)
+        text_color = self.group_text_colors.get(name, "")
+
+        # Parent to Maya rather than this selector so minimizing the selector does
+        # not minimize its Group pop-ups. Use a normal top-level window (not Qt.Tool)
+        # so the pop-up has its own native Close and Minimize controls.
+        popup_flags = (
+            QtCore.Qt.Window
+            | QtCore.Qt.WindowTitleHint
+            | QtCore.Qt.WindowSystemMenuHint
+            | QtCore.Qt.WindowMinimizeButtonHint
+            | QtCore.Qt.WindowCloseButtonHint
+        )
+        popup = QtWidgets.QDialog(get_maya_main_window(), popup_flags)
         popup.setWindowTitle("{} | {}".format(self.root.split("|")[-1], name))
         popup.setMinimumSize(240, 300)
         outer = QtWidgets.QVBoxLayout(popup)
+        outer.setContentsMargins(5, 5, 5, 5)
+
         heading = QtWidgets.QLabel("{} | {}".format(self.root.split("|")[-1], name))
-        heading.setStyleSheet("font-weight: bold; padding: 5px;")
+        heading_rules = ["font-weight: bold;", "padding: 7px;"]
+        if color:
+            heading_rules.append("background-color: {};".format(color))
+        if text_color:
+            heading_rules.append("color: {};".format(text_color))
+        heading.setStyleSheet("QLabel { %s }" % " ".join(heading_rules))
+        heading.setAutoFillBackground(True)
         outer.addWidget(heading)
+
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         container = QtWidgets.QWidget()
@@ -440,17 +472,62 @@ class RigUI(QtWidgets.QDialog):
             button = QtWidgets.QPushButton(full_name.split("|")[-1])
             button.setToolTip(full_name)
             button.clicked.connect(partial(self.select_items, [full_name]))
-            self._apply_button_color(button, None, self.group_text_colors.get(name))
+            # Keep popup buttons at the default UI colors; alternate text color
+            # is reserved for the heading only.
             list_layout.addWidget(button)
         scroll.setWidget(container)
         outer.addWidget(scroll)
-        if color:
-            popup.setStyleSheet(
-                "QDialog { border: 3px solid %s; }" % color
+
+        # This pop-up has its own selection mode, independent of the main UI.
+        mode_row = QtWidgets.QHBoxLayout()
+        mode_row.addWidget(QtWidgets.QLabel("Selection Mode:"))
+        popup_mode_combo = QtWidgets.QComboBox()
+        popup_mode_combo.addItems([
+            "Add to Selection",
+            "Set as Selection",
+            "Remove from Selection",
+            "Toggle Independently",
+            "Toggle Together",
+        ])
+        # Start with the current mode chosen in the main selector, when available.
+        if hasattr(self, "selection_mode_combo"):
+            current_mode = self.selection_mode_combo.currentText()
+            index = popup_mode_combo.findText(current_mode)
+            if index >= 0:
+                popup_mode_combo.setCurrentIndex(index)
+        mode_row.addWidget(popup_mode_combo, 1)
+        outer.addLayout(mode_row)
+
+        select_all_btn = QtWidgets.QPushButton("Select All Group Members")
+        select_all_btn.setToolTip(
+            "Apply the selected selection mode to every control saved in this group."
+        )
+        select_all_btn.clicked.connect(
+            lambda _checked=False, group_items=list(items), combo=popup_mode_combo:
+                self.select_items(group_items, selection_mode=combo.currentText())
+        )
+        outer.addWidget(select_all_btn)
+
+        # Individual control buttons use this pop-up's selection mode as well.
+        for button in container.findChildren(QtWidgets.QPushButton):
+            try:
+                button.clicked.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            full_name = button.toolTip()
+            button.clicked.connect(
+                lambda _checked=False, item=full_name, combo=popup_mode_combo:
+                    self.select_items([item], selection_mode=combo.currentText())
             )
+
+        if color:
+            popup.setStyleSheet("QDialog { border: 3px solid %s; }" % color)
+
+        # Module-level references prevent the pop-ups from being garbage-collected
+        # with the selector that created them.
+        _GROUP_POPUPS.append(popup)
+        popup.destroyed.connect(lambda *_args, p=popup: _forget_group_popup(p))
         popup.show()
-        self._group_popups = getattr(self, "_group_popups", [])
-        self._group_popups.append(popup)
 
     def _make_controls_tab(self):
         widget = QtWidgets.QWidget()
@@ -735,8 +812,12 @@ class RigUI(QtWidgets.QDialog):
         self.selection_sets[name] = list(items)
         self._create_set_button(name, items)
 
-    def select_items(self, items):
-        """Apply the current selection mode to the requested controls."""
+    def select_items(self, items, selection_mode=None):
+        """Apply a selection mode to the requested controls.
+
+        If no mode is supplied, use the main selector's Selection Mode dropdown.
+        Group pop-ups can pass their own independent mode.
+        """
         requested = []
         missing = []
         for item in items:
@@ -752,7 +833,7 @@ class RigUI(QtWidgets.QDialog):
         if not requested:
             return
 
-        mode = self.selection_mode_combo.currentText()
+        mode = selection_mode or self.selection_mode_combo.currentText()
         current = cmds.ls(selection=True, long=True, objectsOnly=True) or []
         current_set = set(current)
 
